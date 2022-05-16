@@ -16,7 +16,9 @@ long int last_lcd_update = millis();
 
 volatile bool timer = false;
 volatile bool btn_start_high = false;
+volatile bool btn_stop_high = false;
 
+bool armed = false;
 bool started = false;
 volatile bool stopped = false;
 
@@ -24,7 +26,7 @@ void setup() {
   lcd.begin(16, 2);
   print_time(0);
   print_reaction_time(0);
-  print_state("odotetaan...    ");
+  print_state("virita ajastin  ");
 
   Serial.begin(115200);
   Serial.setTimeout(1);
@@ -34,7 +36,7 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(btn_start), start_change, CHANGE);
 
-  attachInterrupt(digitalPinToInterrupt(btn_stop), stop_rising, RISING);
+  attachInterrupt(digitalPinToInterrupt(btn_stop), stop_change, CHANGE);
 
   pinMode(buzzer, OUTPUT);
 }
@@ -45,7 +47,7 @@ void loop() {
       last_lcd_update = millis();
       print_time(millis() - start);
     }
-  } else {
+  } else if (armed) {
     if (btn_start_high && !started) {
       handle_start();
 
@@ -53,6 +55,11 @@ void loop() {
       handle_stop();
     }
 
+  } else {
+    if (btn_stop_high) {
+      armed = true;
+      print_state("viritetty       ");
+    }
   }
 }
 
@@ -72,12 +79,22 @@ void start_falling() {
   }
 }
 
+void stop_change() {
+  if (digitalRead(btn_stop) == HIGH) stop_rising();
+  else stop_falling();
+}
+
 void stop_rising() {
+  btn_stop_high = true;
   if (timer) {
     stop = millis();
     stopped = true;
     timer = false;
   }
+}
+
+void stop_falling() {
+  btn_stop_high = false;
 }
 
 void print_time(long int time) {
@@ -136,6 +153,7 @@ void handle_start() {
 void handle_stop() {
   stopped = false;
   started = false;
+  armed = false;
   Serial.println(stop - start);
   print_time(stop - start);
   print_state("lopetus         ");
@@ -143,4 +161,6 @@ void handle_stop() {
   digitalWrite(buzzer, HIGH);
   delay(300);
   digitalWrite(buzzer, LOW);
+  delay(1700);
+  print_state("virita ajastin  ");
 }
